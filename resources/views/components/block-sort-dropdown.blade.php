@@ -1,0 +1,156 @@
+@php
+    $currentSort = request('sort');
+    $currentDirection = strtolower(request('direction', 'asc'));
+    $isSorted = !empty($currentSort);
+
+    $isCodeAsc = $currentSort === 'block_code' && $currentDirection === 'asc';
+    $isCodeDesc = $currentSort === 'block_code' && $currentDirection === 'desc';
+    $isNameAsc = $currentSort === 'name' && $currentDirection === 'asc';
+    $isNameDesc = $currentSort === 'name' && $currentDirection === 'desc';
+
+    $codeAscUrl = request()->fullUrlWithQuery(['sort' => 'block_code', 'direction' => 'asc', 'page' => 1]);
+    $codeDescUrl = request()->fullUrlWithQuery(['sort' => 'block_code', 'direction' => 'desc', 'page' => 1]);
+    $nameAscUrl = request()->fullUrlWithQuery(['sort' => 'name', 'direction' => 'asc', 'page' => 1]);
+    $nameDescUrl = request()->fullUrlWithQuery(['sort' => 'name', 'direction' => 'desc', 'page' => 1]);
+    $resetUrl = request()->fullUrlWithQuery(['sort' => null, 'direction' => null, 'page' => 1]);
+@endphp
+
+<div class="relative inline-block"
+     x-data="{
+         open: false,
+         top: 0,
+         left: 0,
+         updatePosition() {
+             if (!this.$refs.trigger) return;
+             const rect = this.$refs.trigger.getBoundingClientRect();
+             if (rect.width === 0 && rect.height === 0) return;
+             const menuWidth = 240;
+             const measuredHeight = this.$refs.menu ? this.$refs.menu.offsetHeight : 0;
+             const menuHeight = measuredHeight > 0 ? measuredHeight : 280;
+             const gap = 8;
+             let left = rect.right - menuWidth;
+             left = Math.max(12, Math.min(left, window.innerWidth - menuWidth - 12));
+             const spaceBelow = window.innerHeight - rect.bottom;
+             const top = (spaceBelow >= menuHeight || spaceBelow >= rect.top)
+                 ? rect.bottom + gap
+                 : Math.max(12, rect.top - menuHeight - gap);
+             this.top = Math.round(top);
+             this.left = Math.round(left);
+         },
+         toggle() {
+             if (this.open) {
+                 this.open = false;
+                 return;
+             }
+             this.updatePosition();
+             this.open = true;
+             this.$nextTick(() => this.updatePosition());
+         }
+     }"
+     @keydown.escape.window="open = false"
+     @scroll.capture.window="if (open) { const r = $refs.trigger.getBoundingClientRect(); if (r.bottom < 64 || r.top > window.innerHeight - 8) { open = false; } else { updatePosition(); } }"
+     @resize.window="if (open) updatePosition()">
+    <!-- 3-Dot Button for Blocks Filter Bar -->
+    <button x-ref="trigger"
+            type="button"
+            @click="toggle()"
+            :aria-expanded="open.toString()"
+            title="Sort Blocks (Block Number & Name)"
+            class="p-2 sm:px-2.5 rounded-xl border transition-all duration-150 flex items-center justify-center {{ $isSorted ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 shadow-sm' : 'bg-[#0F1420] border-white/[0.08] text-slate-400 hover:text-white hover:border-white/20' }}">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="12" cy="5" r="2.2"/>
+            <circle cx="12" cy="12" r="2.2"/>
+            <circle cx="12" cy="19" r="2.2"/>
+        </svg>
+    </button>
+
+    <!-- Teleported Dropdown Menu (escapes card & backdrop-blur stacking contexts) -->
+    <template x-teleport="body">
+        <div x-show="open"
+             x-cloak
+             x-ref="menu"
+             @click.outside="if (!$refs.trigger || !$refs.trigger.contains($event.target)) open = false"
+             x-transition:enter="transition ease-out duration-100"
+             x-transition:enter-start="opacity-0 scale-95"
+             x-transition:enter-end="opacity-100 scale-100"
+             x-transition:leave="transition ease-in duration-75"
+             x-transition:leave-start="opacity-100 scale-100"
+             x-transition:leave-end="opacity-0 scale-95"
+             :style="{ position: 'fixed', top: top + 'px', left: left + 'px', zIndex: 45 }"
+             class="w-60 rounded-xl bg-[#121927]/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl py-2 text-xs divide-y divide-white/[0.06]"
+             style="display: none;">
+
+        <!-- Header -->
+        <div class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+            <span>Sort Blocks</span>
+            @if($isSorted)
+                <span class="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-mono">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    Active
+                </span>
+            @endif
+        </div>
+
+        <!-- Section 1: Block Number / Code -->
+        <div class="py-1.5">
+            <span class="block px-3 py-1 text-[10px] uppercase font-semibold text-slate-400">By Block Number</span>
+            <a href="{{ $codeAscUrl }}"
+               class="flex items-center justify-between px-3 py-1.5 text-xs transition-colors {{ $isCodeAsc ? 'bg-emerald-500/10 text-emerald-400 font-semibold' : 'text-slate-200 hover:bg-white/[0.05] hover:text-white' }}">
+                <span class="flex items-center gap-2">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"/></svg>
+                    <span>Ascending (BLK-01 &rarr; BLK-50)</span>
+                </span>
+                @if($isCodeAsc)
+                    <svg class="w-3.5 h-3.5 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                @endif
+            </a>
+            <a href="{{ $codeDescUrl }}"
+               class="flex items-center justify-between px-3 py-1.5 text-xs transition-colors {{ $isCodeDesc ? 'bg-emerald-500/10 text-emerald-400 font-semibold' : 'text-slate-200 hover:bg-white/[0.05] hover:text-white' }}">
+                <span class="flex items-center gap-2">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4"/></svg>
+                    <span>Descending (BLK-50 &rarr; BLK-01)</span>
+                </span>
+                @if($isCodeDesc)
+                    <svg class="w-3.5 h-3.5 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                @endif
+            </a>
+        </div>
+
+        <!-- Section 2: Block Name (Alphabetical) -->
+        <div class="py-1.5">
+            <span class="block px-3 py-1 text-[10px] uppercase font-semibold text-slate-400">By Block Name</span>
+            <a href="{{ $nameAscUrl }}"
+               class="flex items-center justify-between px-3 py-1.5 text-xs transition-colors {{ $isNameAsc ? 'bg-emerald-500/10 text-emerald-400 font-semibold' : 'text-slate-200 hover:bg-white/[0.05] hover:text-white' }}">
+                <span class="flex items-center gap-2">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"/></svg>
+                    <span>Ascending (A &rarr; Z)</span>
+                </span>
+                @if($isNameAsc)
+                    <svg class="w-3.5 h-3.5 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                @endif
+            </a>
+            <a href="{{ $nameDescUrl }}"
+               class="flex items-center justify-between px-3 py-1.5 text-xs transition-colors {{ $isNameDesc ? 'bg-emerald-500/10 text-emerald-400 font-semibold' : 'text-slate-200 hover:bg-white/[0.05] hover:text-white' }}">
+                <span class="flex items-center gap-2">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4"/></svg>
+                    <span>Descending (Z &rarr; A)</span>
+                </span>
+                @if($isNameDesc)
+                    <svg class="w-3.5 h-3.5 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                @endif
+            </a>
+        </div>
+
+        @if($isSorted)
+            <!-- Reset Default -->
+            <div class="py-1">
+                <a href="{{ $resetUrl }}"
+                   class="flex items-center gap-2 px-3 py-1.5 text-[11px] text-slate-400 hover:text-white hover:bg-white/[0.05] transition-colors">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    <span>Reset to Default</span>
+                </a>
+            </div>
+        @endif
+        </div>
+    </template>
+</div>
